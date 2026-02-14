@@ -114,6 +114,8 @@ export class GitHubIntegration {
   async listMergedBranches(baseBranch: string): Promise<string[]> {
     try {
       // Get all branches from GitHub
+      // Note: This only fetches the first 100 branches. For repositories with more branches,
+      // pagination would be needed, but this is sufficient for most use cases.
       const branches = await this.octokit.repos.listBranches({
         owner: this.owner,
         repo: this.repo,
@@ -138,7 +140,9 @@ export class GitHubIntegration {
             head: branch.name,
           });
 
-          // If behind_by is 0 and ahead_by is 0, the branch is fully merged
+          // If behind_by is 0 and ahead_by is 0, the branch is fully merged.
+          // This means the branch has identical commits to the base branch,
+          // indicating a successful merge with no additional changes.
           if (comparison.data.behind_by === 0 && comparison.data.ahead_by === 0) {
             mergedBranches.push(branch.name);
           }

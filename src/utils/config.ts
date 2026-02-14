@@ -50,3 +50,7 @@ export function generateBranchName(taskDescription: string): string {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export function formatRepositoryString(owner: string, repo: string): string {
+  return `${owner}/${repo}`;
+}

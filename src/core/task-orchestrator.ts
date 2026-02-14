@@ -1,7 +1,7 @@
 import { AICodeGenerator } from './ai-code-generator';
 import { GitHubIntegration } from '../integrations/github';
 import { Task, CodeGenerationRequest, RepositoryTarget } from '../types';
-import { generateTaskId, generateBranchName } from '../utils/config';
+import { generateTaskId, generateBranchName, formatRepositoryString } from '../utils/config';
 
 export class TaskOrchestrator {
   private aiGenerator: AICodeGenerator;
@@ -69,7 +69,7 @@ export class TaskOrchestrator {
       createdAt: new Date(),
       branch: branchName,
       baseBranch: repoTarget.baseBranch,
-      repository: `${repoTarget.owner}/${repoTarget.repo}`,
+      repository: formatRepositoryString(repoTarget.owner, repoTarget.repo),
     };
 
     this.tasks.set(taskId, task);
@@ -229,10 +229,11 @@ ${result.explanation || result.generatedCode || 'No code changes required'}
           result.deletedBranches.push(branchName);
 
           // Clean up associated tasks
+          const repoString = formatRepositoryString(repoTarget.owner, repoTarget.repo);
           for (const [taskId, task] of this.tasks.entries()) {
             if (
               task.branch === branchName &&
-              task.repository === `${repoTarget.owner}/${repoTarget.repo}` &&
+              task.repository === repoString &&
               task.status === 'completed'
             ) {
               this.tasks.delete(taskId);
