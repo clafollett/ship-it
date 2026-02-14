@@ -1,6 +1,6 @@
-import { App, LogLevel, type BlockAction, type ButtonAction } from '@slack/bolt';
-import type { Task, RepositoryTarget } from '../types';
 import { randomUUID } from 'node:crypto';
+import { App, type BlockAction, type ButtonAction, LogLevel } from '@slack/bolt';
+import type { RepositoryTarget, Task } from '../types';
 
 export class SlackBot {
   private app: App;
@@ -468,6 +468,7 @@ export class SlackBot {
       await ack();
       const action = body as BlockAction<ButtonAction>;
       const channelId = action.actions[0].value ?? '';
+      if (!channelId) return;
 
       try {
         await client.chat.postMessage({
@@ -503,6 +504,7 @@ export class SlackBot {
       await ack();
       const action = body as BlockAction<ButtonAction>;
       const channelId = action.actions[0].value ?? '';
+      if (!channelId) return;
 
       try {
         await client.views.open({

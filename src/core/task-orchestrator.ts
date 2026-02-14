@@ -1,7 +1,7 @@
-import { AICodeGenerator } from './ai-code-generator';
 import { GitHubIntegration } from '../integrations/github';
-import type { Task, CodeGenerationRequest, RepositoryTarget } from '../types';
-import { generateTaskId, generateBranchName, formatRepositoryString } from '../utils/config';
+import type { CodeGenerationRequest, RepositoryTarget, Task } from '../types';
+import { formatRepositoryString, generateBranchName, generateTaskId } from '../utils/config';
+import { AICodeGenerator } from './ai-code-generator';
 
 export class TaskOrchestrator {
   private aiGenerator: AICodeGenerator;

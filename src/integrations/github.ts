@@ -1,7 +1,7 @@
-import { Octokit } from '@octokit/rest';
-import simpleGit, { type SimpleGit } from 'simple-git';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { Octokit } from '@octokit/rest';
+import simpleGit, { type SimpleGit } from 'simple-git';
 import type { CodeGenerationResult } from '../types';
 
 export class GitHubIntegration {
