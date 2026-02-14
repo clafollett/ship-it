@@ -111,6 +111,64 @@ export class GitHubIntegration {
     }
   }
 
+  async listMergedBranches(baseBranch: string): Promise<string[]> {
+    try {
+      // Get all branches from GitHub
+      const branches = await this.octokit.repos.listBranches({
+        owner: this.owner,
+        repo: this.repo,
+        per_page: 100,
+      });
+
+      const mergedBranches: string[] = [];
+
+      // Check each branch to see if it's merged
+      for (const branch of branches.data) {
+        // Skip the base branch itself
+        if (branch.name === baseBranch) {
+          continue;
+        }
+
+        try {
+          // Compare the branch with the base branch
+          const comparison = await this.octokit.repos.compareCommits({
+            owner: this.owner,
+            repo: this.repo,
+            base: baseBranch,
+            head: branch.name,
+          });
+
+          // If behind_by is 0 and ahead_by is 0, the branch is merged
+          // Or if the branch's commits are all in the base branch
+          if (comparison.data.behind_by === 0 && comparison.data.ahead_by === 0) {
+            mergedBranches.push(branch.name);
+          }
+        } catch (error) {
+          console.error(`Error checking if branch ${branch.name} is merged:`, error);
+        }
+      }
+
+      return mergedBranches;
+    } catch (error) {
+      console.error('Error listing merged branches:', error);
+      throw error;
+    }
+  }
+
+  async deleteBranch(branchName: string): Promise<void> {
+    try {
+      await this.octokit.git.deleteRef({
+        owner: this.owner,
+        repo: this.repo,
+        ref: `heads/${branchName}`,
+      });
+      console.log(`Deleted branch: ${branchName}`);
+    } catch (error) {
+      console.error(`Error deleting branch ${branchName}:`, error);
+      throw error;
+    }
+  }
+
   async cleanup(): Promise<void> {
     try {
       await fs.rm(this.workingDir, { recursive: true, force: true });
