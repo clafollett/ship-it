@@ -1,4 +1,4 @@
-import { App, LogLevel, BlockAction } from '@slack/bolt';
+import { App, LogLevel, BlockAction, ButtonAction } from '@slack/bolt';
 import { Task, RepositoryTarget } from '../types';
 import { randomUUID } from 'crypto';
 
@@ -153,13 +153,13 @@ export class SlackBot {
     // Handle "Use Default" button
     this.app.action('use_default', async ({ ack, body, client }) => {
       await ack();
-      const action = body as any;
-      const taskId = action.actions[0].value;
+      const action = body as BlockAction<ButtonAction>;
+      const taskId = action.actions[0].value!;
       const pending = this.pendingTasks.get(taskId);
 
       if (!pending) {
         await client.chat.postMessage({
-          channel: action.channel.id,
+          channel: action.channel!.id,
           text: '❌ Task expired. Please try again.',
         });
         return;
@@ -168,8 +168,8 @@ export class SlackBot {
       this.pendingTasks.delete(taskId);
 
       await client.chat.update({
-        channel: action.channel.id,
-        ts: action.message.ts,
+        channel: action.channel!.id,
+        ts: action.message!.ts,
         text: `✅ Working on: "${pending.instruction}"\nRepository: ${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo} → ${this.defaultRepoTarget.baseBranch}`,
         blocks: [],
       });
@@ -187,13 +187,13 @@ export class SlackBot {
     // Handle "Specify Different" button - open modal
     this.app.action('specify_repo', async ({ ack, body, client }) => {
       await ack();
-      const action = body as any;
-      const taskId = action.actions[0].value;
+      const action = body as BlockAction<ButtonAction>;
+      const taskId = action.actions[0].value!;
       const pending = this.pendingTasks.get(taskId);
 
       if (!pending) {
         await client.chat.postMessage({
-          channel: action.channel.id,
+          channel: action.channel!.id,
           text: '❌ Task expired. Please try again.',
         });
         return;
@@ -291,7 +291,7 @@ export class SlackBot {
       } catch (error) {
         console.error('Error opening modal:', error);
         await client.chat.postMessage({
-          channel: action.channel.id,
+          channel: action.channel!.id,
           text: '❌ Failed to open configuration dialog. Please try again.',
         });
       }
@@ -462,8 +462,8 @@ export class SlackBot {
     // Handle cleanup default button
     this.app.action('cleanup_default', async ({ ack, body, client }) => {
       await ack();
-      const action = body as any;
-      const channelId = action.actions[0].value;
+      const action = body as BlockAction<ButtonAction>;
+      const channelId = action.actions[0].value!;
 
       try {
         await client.chat.postMessage({
@@ -497,8 +497,8 @@ export class SlackBot {
     // Handle cleanup specify button
     this.app.action('cleanup_specify', async ({ ack, body, client }) => {
       await ack();
-      const action = body as any;
-      const channelId = action.actions[0].value;
+      const action = body as BlockAction<ButtonAction>;
+      const channelId = action.actions[0].value!;
 
       try {
         await client.views.open({
