@@ -7,6 +7,8 @@ export interface Task {
   createdAt: Date;
   completedAt?: Date;
   branch?: string;
+  baseBranch?: string;
+  repository?: string;
   pullRequestUrl?: string;
   error?: string;
 }
@@ -55,4 +57,10 @@ export interface Config {
   githubRepo: string;
   workingDirectory: string;
   defaultBranch: string;
+}
+
+export interface RepositoryTarget {
+  owner: string;
+  repo: string;
+  baseBranch: string;
 }

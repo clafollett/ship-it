@@ -1,30 +1,36 @@
 import { TaskOrchestrator } from './core/task-orchestrator';
 import { SlackBot } from './integrations/slack';
 import { loadConfig } from './utils/config';
-import { Task } from './types';
+import { Task, RepositoryTarget } from './types';
 
 class ShipItApp {
   private orchestrator: TaskOrchestrator;
   private slackBot: SlackBot;
   private config: ReturnType<typeof loadConfig>;
+  private defaultRepoTarget: RepositoryTarget;
 
   constructor() {
     this.config = loadConfig();
 
+    this.defaultRepoTarget = {
+      owner: this.config.githubOwner,
+      repo: this.config.githubRepo,
+      baseBranch: this.config.defaultBranch,
+    };
+
     this.orchestrator = new TaskOrchestrator(
       this.config.anthropicApiKey,
       this.config.githubToken,
-      this.config.githubOwner,
-      this.config.githubRepo,
+      this.defaultRepoTarget,
       this.config.workingDirectory,
-      this.config.defaultBranch,
       this.config.anthropicModel
     );
 
     this.slackBot = new SlackBot(
       this.config.slackBotToken,
       this.config.slackAppToken,
-      this.config.slackSigningSecret
+      this.config.slackSigningSecret,
+      this.defaultRepoTarget
     );
   }
 
@@ -36,29 +42,45 @@ class ShipItApp {
       await this.orchestrator.initialize();
 
       // Set up task handler for Slack
-      this.slackBot.onTask(async (instruction: string, userId: string, channel: string) => {
-        try {
-          // Determine task type from instruction
-          const taskType = this.determineTaskType(instruction);
+      this.slackBot.onTask(
+        async (
+          instruction: string,
+          userId: string,
+          channel: string,
+          repoTarget: RepositoryTarget
+        ) => {
+          try {
+            // Determine task type from instruction
+            const taskType = this.determineTaskType(instruction);
 
-          // Execute the task
-          const task = await this.orchestrator.executeTask(instruction, userId, taskType);
+            // Execute the task with specified repository target
+            const task = await this.orchestrator.executeTask(
+              instruction,
+              userId,
+              repoTarget,
+              taskType
+            );
 
-          // Send update back to Slack
-          await this.slackBot.sendTaskUpdate(channel, task);
-        } catch (error) {
-          console.error('Error processing task:', error);
-          await this.slackBot.sendMessage(
-            channel,
-            `❌ Failed to process task: ${error instanceof Error ? error.message : 'Unknown error'}`
-          );
+            // Send update back to Slack
+            await this.slackBot.sendTaskUpdate(channel, task);
+          } catch (error) {
+            console.error('Error processing task:', error);
+            await this.slackBot.sendMessage(
+              channel,
+              `❌ Failed to process task: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          }
         }
-      });
+      );
 
       // Start the Slack bot
       await this.slackBot.start();
 
       console.log('✅ ShipIt is ready! Waiting for developer instructions...');
+      console.log(
+        `📦 Default repository: ${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo}`
+      );
+      console.log(`🌿 Default branch: ${this.defaultRepoTarget.baseBranch}`);
     } catch (error) {
       console.error('Failed to start ShipIt:', error);
       process.exit(1);

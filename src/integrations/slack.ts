@@ -1,11 +1,22 @@
-import { App, LogLevel } from '@slack/bolt';
-import { Task } from '../types';
+import { App, LogLevel, BlockAction } from '@slack/bolt';
+import { Task, RepositoryTarget } from '../types';
 
 export class SlackBot {
   private app: App;
-  private taskHandler?: (instruction: string, userId: string, channel: string) => Promise<void>;
+  private taskHandler?: (
+    instruction: string,
+    userId: string,
+    channel: string,
+    repoTarget: RepositoryTarget
+  ) => Promise<void>;
+  private defaultRepoTarget: RepositoryTarget;
 
-  constructor(botToken: string, appToken: string, signingSecret: string) {
+  constructor(
+    botToken: string,
+    appToken: string,
+    signingSecret: string,
+    defaultRepoTarget: RepositoryTarget
+  ) {
     this.app = new App({
       token: botToken,
       appToken: appToken,
@@ -13,11 +24,18 @@ export class SlackBot {
       socketMode: true,
       logLevel: LogLevel.INFO,
     });
+    this.defaultRepoTarget = defaultRepoTarget;
 
     this.setupEventHandlers();
   }
 
   private setupEventHandlers(): void {
+    // Store pending tasks for button interactions
+    const pendingTasks = new Map<
+      string,
+      { instruction: string; userId: string; channel: string }
+    >();
+
     // Listen for app mentions
     this.app.event('app_mention', async ({ event, client }) => {
       try {
@@ -32,17 +50,242 @@ export class SlackBot {
           return;
         }
 
+        // Post message with button to configure repository
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        pendingTasks.set(taskId, {
+          instruction: text,
+          userId: event.user!,
+          channel: event.channel,
+        });
+
         await client.chat.postMessage({
           channel: event.channel,
           thread_ts: event.ts,
-          text: `Got it! I'm working on: "${text}"\nI'll let you know when it's ready for review.`,
+          text: `Got it! Let me know which repository and branch to target:`,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*Task:* ${text}\n\n*Default:* \`${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo}\` → \`${this.defaultRepoTarget.baseBranch}\``,
+              },
+            },
+            {
+              type: 'actions',
+              block_id: `configure_${taskId}`,
+              elements: [
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: '✓ Use Default',
+                  },
+                  style: 'primary',
+                  action_id: 'use_default',
+                  value: taskId,
+                },
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: '⚙️ Specify Different',
+                  },
+                  action_id: 'specify_repo',
+                  value: taskId,
+                },
+              ],
+            },
+          ],
         });
-
-        if (this.taskHandler && event.user) {
-          await this.taskHandler(text, event.user, event.channel);
-        }
       } catch (error) {
         console.error('Error handling app mention:', error);
+      }
+    });
+
+    // Handle "Use Default" button
+    this.app.action('use_default', async ({ ack, body, client }) => {
+      await ack();
+      const action = body as any;
+      const taskId = action.actions[0].value;
+      const pending = pendingTasks.get(taskId);
+
+      if (!pending) {
+        await client.chat.postMessage({
+          channel: action.channel.id,
+          text: '❌ Task expired. Please try again.',
+        });
+        return;
+      }
+
+      pendingTasks.delete(taskId);
+
+      await client.chat.update({
+        channel: action.channel.id,
+        ts: action.message.ts,
+        text: `✅ Working on: "${pending.instruction}"\nRepository: ${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo} → ${this.defaultRepoTarget.baseBranch}`,
+        blocks: [],
+      });
+
+      if (this.taskHandler) {
+        await this.taskHandler(
+          pending.instruction,
+          pending.userId,
+          pending.channel,
+          this.defaultRepoTarget
+        );
+      }
+    });
+
+    // Handle "Specify Different" button - open modal
+    this.app.action('specify_repo', async ({ ack, body, client }) => {
+      await ack();
+      const action = body as any;
+      const taskId = action.actions[0].value;
+      const pending = pendingTasks.get(taskId);
+
+      if (!pending) {
+        await client.chat.postMessage({
+          channel: action.channel.id,
+          text: '❌ Task expired. Please try again.',
+        });
+        return;
+      }
+
+      try {
+        await client.views.open({
+          trigger_id: action.trigger_id,
+          view: {
+            type: 'modal',
+            callback_id: 'repo_branch_modal',
+            private_metadata: taskId,
+            title: {
+              type: 'plain_text',
+              text: 'Select Repository',
+            },
+            submit: {
+              type: 'plain_text',
+              text: 'Submit',
+            },
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*Task:* ${pending.instruction}`,
+                },
+              },
+              {
+                type: 'divider',
+              },
+              {
+                type: 'input',
+                block_id: 'repository_block',
+                element: {
+                  type: 'plain_text_input',
+                  action_id: 'repository_input',
+                  initial_value: this.defaultRepoTarget.owner,
+                  placeholder: {
+                    type: 'plain_text',
+                    text: 'e.g., myorg or myusername',
+                  },
+                },
+                label: {
+                  type: 'plain_text',
+                  text: 'Repository Owner',
+                },
+              },
+              {
+                type: 'input',
+                block_id: 'repo_name_block',
+                element: {
+                  type: 'plain_text_input',
+                  action_id: 'repo_name_input',
+                  initial_value: this.defaultRepoTarget.repo,
+                  placeholder: {
+                    type: 'plain_text',
+                    text: 'e.g., my-repo',
+                  },
+                },
+                label: {
+                  type: 'plain_text',
+                  text: 'Repository Name',
+                },
+              },
+              {
+                type: 'input',
+                block_id: 'branch_block',
+                element: {
+                  type: 'plain_text_input',
+                  action_id: 'branch_input',
+                  initial_value: this.defaultRepoTarget.baseBranch,
+                  placeholder: {
+                    type: 'plain_text',
+                    text: 'e.g., main or develop',
+                  },
+                },
+                label: {
+                  type: 'plain_text',
+                  text: 'Base Branch (PR target)',
+                },
+              },
+              {
+                type: 'context',
+                elements: [
+                  {
+                    type: 'mrkdwn',
+                    text: '💡 A new working branch will be created and a PR will be opened to merge into the base branch.',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+      } catch (error) {
+        console.error('Error opening modal:', error);
+        await client.chat.postMessage({
+          channel: action.channel.id,
+          text: '❌ Failed to open configuration dialog. Please try again.',
+        });
+      }
+    });
+
+    // Handle modal submissions
+    this.app.view('repo_branch_modal', async ({ ack, body, view, client }) => {
+      await ack();
+
+      try {
+        const taskId = view.private_metadata;
+        const pending = pendingTasks.get(taskId);
+
+        if (!pending) {
+          return;
+        }
+
+        pendingTasks.delete(taskId);
+
+        const values = view.state.values;
+        const owner =
+          values.repository_block.repository_input.value || this.defaultRepoTarget.owner;
+        const repo = values.repo_name_block.repo_name_input.value || this.defaultRepoTarget.repo;
+        const baseBranch =
+          values.branch_block.branch_input.value || this.defaultRepoTarget.baseBranch;
+
+        const repoTarget: RepositoryTarget = {
+          owner: owner.trim(),
+          repo: repo.trim(),
+          baseBranch: baseBranch.trim(),
+        };
+
+        await client.chat.postMessage({
+          channel: pending.channel,
+          text: `✅ Working on: "${pending.instruction}"\nRepository: ${repoTarget.owner}/${repoTarget.repo} → ${repoTarget.baseBranch}`,
+        });
+
+        if (this.taskHandler) {
+          await this.taskHandler(pending.instruction, pending.userId, pending.channel, repoTarget);
+        }
+      } catch (error) {
+        console.error('Error handling modal submission:', error);
       }
     });
 
@@ -61,21 +304,66 @@ export class SlackBot {
           return;
         }
 
-        await client.chat.postMessage({
+        // Post message with button to configure repository
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        pendingTasks.set(taskId, {
+          instruction,
+          userId: command.user_id,
           channel: command.channel_id,
-          text: `Working on: "${instruction}"\nI'll notify you when it's complete!`,
         });
 
-        if (this.taskHandler) {
-          await this.taskHandler(instruction, command.user_id, command.channel_id);
-        }
+        await client.chat.postMessage({
+          channel: command.channel_id,
+          text: `Got it! Let me know which repository and branch to target:`,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*Task:* ${instruction}\n\n*Default:* \`${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo}\` → \`${this.defaultRepoTarget.baseBranch}\``,
+              },
+            },
+            {
+              type: 'actions',
+              block_id: `configure_${taskId}`,
+              elements: [
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: '✓ Use Default',
+                  },
+                  style: 'primary',
+                  action_id: 'use_default',
+                  value: taskId,
+                },
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: '⚙️ Specify Different',
+                  },
+                  action_id: 'specify_repo',
+                  value: taskId,
+                },
+              ],
+            },
+          ],
+        });
       } catch (error) {
         console.error('Error handling slash command:', error);
       }
     });
   }
 
-  onTask(handler: (instruction: string, userId: string, channel: string) => Promise<void>): void {
+  onTask(
+    handler: (
+      instruction: string,
+      userId: string,
+      channel: string,
+      repoTarget: RepositoryTarget
+    ) => Promise<void>
+  ): void {
     this.taskHandler = handler;
   }
 

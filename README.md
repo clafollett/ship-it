@@ -124,10 +124,11 @@ npm start
 In any channel where the bot is present:
 ```
 @ShipIt Add user authentication to the login page
-@ShipIt Fix the bug in the payment processing module
-@ShipIt Refactor the database connection code for better performance
-@ShipIt Add tests for the user service
 ```
+
+The bot will prompt you to select which repository and branch to target:
+- **Use Default**: Uses the configured repository and branch from `.env`
+- **Specify Different**: Opens a modal to specify custom repository owner, name, and base branch
 
 ### Via Slash Command
 
@@ -136,18 +137,41 @@ In any channel where the bot is present:
 /shipit Create a new dashboard component
 ```
 
+Similar to mentions, the bot will prompt for repository and branch selection.
+
 ### Example Workflow
 
 1. Developer sends instruction via Slack: `@ShipIt Add input validation to the signup form`
-2. ShipIt acknowledges and starts processing
-3. AI generates code changes
-4. ShipIt creates a new branch (e.g., `ai-task/add-input-validation-signup-form-1234567890`)
-5. Changes are committed and pushed
-6. Pull request is automatically created
-7. Developer reviews the PR, requests changes if needed, or merges
-8. ShipIt notifies completion via Slack
+2. ShipIt prompts: "Which repository and branch?"
+   - Option 1: **Use Default** (configured in `.env`)
+   - Option 2: **Specify Different** (opens modal to enter custom repo/branch)
+3. Developer selects repository and branch
+4. ShipIt acknowledges and starts processing
+5. AI generates code changes
+6. ShipIt creates a new branch (e.g., `ai-task/add-input-validation-signup-form-1234567890`)
+7. Changes are committed and pushed
+8. Pull request is automatically created targeting the specified base branch
+9. Developer reviews the PR, requests changes if needed, or merges
+10. ShipIt notifies completion via Slack
 
 ## 🔧 Configuration
+
+### Repository Selection
+
+ShipIt now supports targeting different repositories and branches for each request:
+
+**Default Repository**: Configured in `.env` file
+```env
+GITHUB_OWNER=your-github-username
+GITHUB_REPO=your-repository-name
+DEFAULT_BRANCH=main
+```
+
+**Per-Request Selection**: When you mention `@ShipIt` or use `/shipit`, you'll be prompted to:
+1. Use the default repository and branch
+2. Specify a different repository and/or branch
+
+This allows a single ShipIt instance to manage code changes across multiple repositories!
 
 ### Task Types
 

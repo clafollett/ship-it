@@ -2,6 +2,28 @@
 
 This document provides real-world examples of how to use ShipIt for various development tasks.
 
+## Repository and Branch Selection
+
+With ShipIt, you can target different repositories and branches for each request!
+
+### Using Default Repository
+```
+@ShipIt Add user authentication
+→ Click "Use Default" button
+→ Works on configured repo from .env
+```
+
+### Specifying Different Repository
+```
+@ShipIt Fix bug in payment service
+→ Click "Specify Different" button
+→ Enter:
+   - Repository Owner: myorg
+   - Repository Name: payment-service
+   - Base Branch: develop
+→ ShipIt creates PR in myorg/payment-service targeting develop branch
+```
+
 ## Basic Examples
 
 ### 1. Adding a New Feature
