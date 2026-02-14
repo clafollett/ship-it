@@ -1,5 +1,6 @@
 import { App, LogLevel, BlockAction } from '@slack/bolt';
 import { Task, RepositoryTarget } from '../types';
+import { randomUUID } from 'crypto';
 
 export class SlackBot {
   private app: App;
@@ -10,6 +11,11 @@ export class SlackBot {
     repoTarget: RepositoryTarget
   ) => Promise<void>;
   private defaultRepoTarget: RepositoryTarget;
+  private pendingTasks: Map<
+    string,
+    { instruction: string; userId: string; channel: string; timestamp: number }
+  >;
+  private cleanupInterval: NodeJS.Timeout | null;
 
   constructor(
     botToken: string,
@@ -25,17 +31,32 @@ export class SlackBot {
       logLevel: LogLevel.INFO,
     });
     this.defaultRepoTarget = defaultRepoTarget;
+    this.pendingTasks = new Map();
+    this.cleanupInterval = null;
 
     this.setupEventHandlers();
+    this.startCleanupTask();
+  }
+
+  private startCleanupTask(): void {
+    // Clean up expired tasks every 5 minutes
+    this.cleanupInterval = setInterval(
+      () => {
+        const now = Date.now();
+        const expirationTime = 30 * 60 * 1000; // 30 minutes
+
+        for (const [taskId, task] of this.pendingTasks.entries()) {
+          if (now - task.timestamp > expirationTime) {
+            this.pendingTasks.delete(taskId);
+            console.log(`Cleaned up expired pending task: ${taskId}`);
+          }
+        }
+      },
+      5 * 60 * 1000
+    );
   }
 
   private setupEventHandlers(): void {
-    // Store pending tasks for button interactions
-    const pendingTasks = new Map<
-      string,
-      { instruction: string; userId: string; channel: string }
-    >();
-
     // Listen for app mentions
     this.app.event('app_mention', async ({ event, client }) => {
       try {
@@ -51,11 +72,12 @@ export class SlackBot {
         }
 
         // Post message with button to configure repository
-        const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        pendingTasks.set(taskId, {
+        const taskId = randomUUID();
+        this.pendingTasks.set(taskId, {
           instruction: text,
           userId: event.user!,
           channel: event.channel,
+          timestamp: Date.now(),
         });
 
         await client.chat.postMessage({
@@ -107,7 +129,7 @@ export class SlackBot {
       await ack();
       const action = body as any;
       const taskId = action.actions[0].value;
-      const pending = pendingTasks.get(taskId);
+      const pending = this.pendingTasks.get(taskId);
 
       if (!pending) {
         await client.chat.postMessage({
@@ -117,7 +139,7 @@ export class SlackBot {
         return;
       }
 
-      pendingTasks.delete(taskId);
+      this.pendingTasks.delete(taskId);
 
       await client.chat.update({
         channel: action.channel.id,
@@ -141,7 +163,7 @@ export class SlackBot {
       await ack();
       const action = body as any;
       const taskId = action.actions[0].value;
-      const pending = pendingTasks.get(taskId);
+      const pending = this.pendingTasks.get(taskId);
 
       if (!pending) {
         await client.chat.postMessage({
@@ -255,13 +277,13 @@ export class SlackBot {
 
       try {
         const taskId = view.private_metadata;
-        const pending = pendingTasks.get(taskId);
+        const pending = this.pendingTasks.get(taskId);
 
         if (!pending) {
           return;
         }
 
-        pendingTasks.delete(taskId);
+        this.pendingTasks.delete(taskId);
 
         const values = view.state.values;
         const owner =
@@ -305,11 +327,12 @@ export class SlackBot {
         }
 
         // Post message with button to configure repository
-        const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        pendingTasks.set(taskId, {
+        const taskId = randomUUID();
+        this.pendingTasks.set(taskId, {
           instruction,
           userId: command.user_id,
           channel: command.channel_id,
+          timestamp: Date.now(),
         });
 
         await client.chat.postMessage({
@@ -413,6 +436,10 @@ export class SlackBot {
   }
 
   async stop(): Promise<void> {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
     await this.app.stop();
     console.log('Slack bot stopped');
   }
