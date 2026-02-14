@@ -1,7 +1,7 @@
-import { AICodeGenerator } from './ai-code-generator';
 import { GitHubIntegration } from '../integrations/github';
-import { Task, CodeGenerationRequest, RepositoryTarget } from '../types';
-import { generateTaskId, generateBranchName, formatRepositoryString } from '../utils/config';
+import type { CodeGenerationRequest, RepositoryTarget, Task } from '../types';
+import { formatRepositoryString, generateBranchName, generateTaskId } from '../utils/config';
+import { AICodeGenerator } from './ai-code-generator';
 
 export class TaskOrchestrator {
   private aiGenerator: AICodeGenerator;
@@ -37,18 +37,19 @@ export class TaskOrchestrator {
   private async getGitHubIntegration(repoTarget: RepositoryTarget): Promise<GitHubIntegration> {
     const key = `${repoTarget.owner}/${repoTarget.repo}`;
 
-    if (!this.githubInstances.has(key)) {
+    let instance = this.githubInstances.get(key);
+    if (!instance) {
       const workingDir = `${this.workingDirBase}/${repoTarget.owner}-${repoTarget.repo}`;
-      const github = new GitHubIntegration(
+      instance = new GitHubIntegration(
         this.githubToken,
         repoTarget.owner,
         repoTarget.repo,
         workingDir
       );
-      this.githubInstances.set(key, github);
+      this.githubInstances.set(key, instance);
     }
 
-    return this.githubInstances.get(key)!;
+    return instance;
   }
 
   async executeTask(
@@ -88,7 +89,7 @@ export class TaskOrchestrator {
       // Initialize repository if needed
       try {
         await github.initializeRepository(repoTarget.baseBranch);
-      } catch (error) {
+      } catch (_error) {
         console.log('Repository already initialized or initialization failed, continuing...');
       }
 

@@ -1,34 +1,26 @@
-import { Config } from '../types';
 import * as dotenv from 'dotenv';
+import type { Config } from '../types';
 
 dotenv.config();
 
-export function loadConfig(): Config {
-  const requiredEnvVars = [
-    'ANTHROPIC_API_KEY',
-    'SLACK_BOT_TOKEN',
-    'SLACK_APP_TOKEN',
-    'SLACK_SIGNING_SECRET',
-    'GITHUB_TOKEN',
-    'GITHUB_OWNER',
-    'GITHUB_REPO',
-  ];
-
-  for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-      throw new Error(`Missing required environment variable: ${envVar}`);
-    }
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
   }
+  return value;
+}
 
+export function loadConfig(): Config {
   return {
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY!,
+    anthropicApiKey: requireEnv('ANTHROPIC_API_KEY'),
     anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4.5-20250514',
-    slackBotToken: process.env.SLACK_BOT_TOKEN!,
-    slackAppToken: process.env.SLACK_APP_TOKEN!,
-    slackSigningSecret: process.env.SLACK_SIGNING_SECRET!,
-    githubToken: process.env.GITHUB_TOKEN!,
-    githubOwner: process.env.GITHUB_OWNER!,
-    githubRepo: process.env.GITHUB_REPO!,
+    slackBotToken: requireEnv('SLACK_BOT_TOKEN'),
+    slackAppToken: requireEnv('SLACK_APP_TOKEN'),
+    slackSigningSecret: requireEnv('SLACK_SIGNING_SECRET'),
+    githubToken: requireEnv('GITHUB_TOKEN'),
+    githubOwner: requireEnv('GITHUB_OWNER'),
+    githubRepo: requireEnv('GITHUB_REPO'),
     workingDirectory: process.env.WORKING_DIRECTORY || './workspace',
     defaultBranch: process.env.DEFAULT_BRANCH || 'main',
   };
