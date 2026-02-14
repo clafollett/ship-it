@@ -10,13 +10,24 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:config": "node scripts/test-config.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/clafollett/ship-it.git"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "code-generation",
+    "claude",
+    "anthropic",
+    "slack-bot",
+    "automation",
+    "developer-tools",
+    "typescript",
+    "github-integration"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
