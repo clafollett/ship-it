@@ -1,7 +1,7 @@
 import { TaskOrchestrator } from './core/task-orchestrator';
 import { SlackBot } from './integrations/slack';
 import { loadConfig } from './utils/config';
-import { Task, RepositoryTarget } from './types';
+import type { Task, RepositoryTarget } from './types';
 
 class ShipItApp {
   private orchestrator: TaskOrchestrator;

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { CodeGenerationRequest, CodeGenerationResult } from '../types';
+import type { CodeGenerationRequest, CodeGenerationResult } from '../types';
 
 export class AICodeGenerator {
   private client: Anthropic;
@@ -116,7 +116,7 @@ Format your response as JSON with the following structure:
         explanation: parsed.explanation,
         generatedCode: parsed.code || text,
       };
-    } catch (error) {
+    } catch (_error) {
       console.warn('Failed to parse Claude response as JSON, using raw text');
       return {
         success: true,

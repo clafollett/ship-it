@@ -1,6 +1,6 @@
-import { App, LogLevel, BlockAction, ButtonAction } from '@slack/bolt';
-import { Task, RepositoryTarget } from '../types';
-import { randomUUID } from 'crypto';
+import { App, LogLevel, type BlockAction, type ButtonAction } from '@slack/bolt';
+import type { Task, RepositoryTarget } from '../types';
+import { randomUUID } from 'node:crypto';
 
 export class SlackBot {
   private app: App;
@@ -101,7 +101,7 @@ export class SlackBot {
         const taskId = randomUUID();
         this.pendingTasks.set(taskId, {
           instruction: text,
-          userId: event.user!,
+          userId: event.user ?? '',
           channel: event.channel,
           timestamp: Date.now(),
         });
@@ -154,12 +154,14 @@ export class SlackBot {
     this.app.action('use_default', async ({ ack, body, client }) => {
       await ack();
       const action = body as BlockAction<ButtonAction>;
-      const taskId = action.actions[0].value!;
+      const channelId = action.channel?.id;
+      if (!channelId) return;
+      const taskId = action.actions[0].value ?? '';
       const pending = this.pendingTasks.get(taskId);
 
       if (!pending) {
         await client.chat.postMessage({
-          channel: action.channel!.id,
+          channel: channelId,
           text: '❌ Task expired. Please try again.',
         });
         return;
@@ -168,8 +170,8 @@ export class SlackBot {
       this.pendingTasks.delete(taskId);
 
       await client.chat.update({
-        channel: action.channel!.id,
-        ts: action.message!.ts,
+        channel: channelId,
+        ts: action.message?.ts ?? '',
         text: `✅ Working on: "${pending.instruction}"\nRepository: ${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo} → ${this.defaultRepoTarget.baseBranch}`,
         blocks: [],
       });
@@ -188,12 +190,14 @@ export class SlackBot {
     this.app.action('specify_repo', async ({ ack, body, client }) => {
       await ack();
       const action = body as BlockAction<ButtonAction>;
-      const taskId = action.actions[0].value!;
+      const channelId = action.channel?.id;
+      if (!channelId) return;
+      const taskId = action.actions[0].value ?? '';
       const pending = this.pendingTasks.get(taskId);
 
       if (!pending) {
         await client.chat.postMessage({
-          channel: action.channel!.id,
+          channel: channelId,
           text: '❌ Task expired. Please try again.',
         });
         return;
@@ -291,14 +295,14 @@ export class SlackBot {
       } catch (error) {
         console.error('Error opening modal:', error);
         await client.chat.postMessage({
-          channel: action.channel!.id,
+          channel: channelId,
           text: '❌ Failed to open configuration dialog. Please try again.',
         });
       }
     });
 
     // Handle modal submissions
-    this.app.view('repo_branch_modal', async ({ ack, body, view, client }) => {
+    this.app.view('repo_branch_modal', async ({ ack, view, client }) => {
       await ack();
 
       try {
@@ -463,7 +467,7 @@ export class SlackBot {
     this.app.action('cleanup_default', async ({ ack, body, client }) => {
       await ack();
       const action = body as BlockAction<ButtonAction>;
-      const channelId = action.actions[0].value!;
+      const channelId = action.actions[0].value ?? '';
 
       try {
         await client.chat.postMessage({
@@ -498,7 +502,7 @@ export class SlackBot {
     this.app.action('cleanup_specify', async ({ ack, body, client }) => {
       await ack();
       const action = body as BlockAction<ButtonAction>;
-      const channelId = action.actions[0].value!;
+      const channelId = action.actions[0].value ?? '';
 
       try {
         await client.views.open({
@@ -582,9 +586,9 @@ export class SlackBot {
       const channelId = view.private_metadata;
       const values = view.state.values;
 
-      const owner = values.repository_block.repository_input.value!;
-      const repo = values.repo_name_block.repo_name_input.value!;
-      const baseBranch = values.branch_block.branch_input.value!;
+      const owner = values.repository_block.repository_input.value ?? '';
+      const repo = values.repo_name_block.repo_name_input.value ?? '';
+      const baseBranch = values.branch_block.branch_input.value ?? '';
 
       try {
         await client.chat.postMessage({
