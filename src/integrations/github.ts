@@ -138,8 +138,7 @@ export class GitHubIntegration {
             head: branch.name,
           });
 
-          // If behind_by is 0 and ahead_by is 0, the branch is merged
-          // Or if the branch's commits are all in the base branch
+          // If behind_by is 0 and ahead_by is 0, the branch is fully merged
           if (comparison.data.behind_by === 0 && comparison.data.ahead_by === 0) {
             mergedBranches.push(branch.name);
           }

@@ -61,6 +61,27 @@ export class SlackBot {
     );
   }
 
+  private formatCleanupResult(
+    repoTarget: RepositoryTarget,
+    result: { deletedBranches: string[]; cleanedTasks: string[]; errors: string[] }
+  ): string {
+    let message = `✅ *Cleanup Complete*\n\n`;
+    message += `*Repository:* ${repoTarget.owner}/${repoTarget.repo}\n`;
+    message += `*Base Branch:* ${repoTarget.baseBranch}\n\n`;
+    message += `*Deleted Branches:* ${result.deletedBranches.length}\n`;
+    message += `*Cleaned Tasks:* ${result.cleanedTasks.length}\n`;
+
+    if (result.deletedBranches.length > 0) {
+      message += `\n*Branches Deleted:*\n${result.deletedBranches.map((b) => `• \`${b}\``).join('\n')}\n`;
+    }
+
+    if (result.errors.length > 0) {
+      message += `\n⚠️ *Errors:*\n${result.errors.map((e) => `• ${e}`).join('\n')}`;
+    }
+
+    return message;
+  }
+
   private setupEventHandlers(): void {
     // Listen for app mentions
     this.app.event('app_mention', async ({ event, client }) => {
@@ -452,20 +473,7 @@ export class SlackBot {
 
         if (this.cleanupHandler) {
           const result = await this.cleanupHandler(this.defaultRepoTarget);
-
-          let message = `✅ *Cleanup Complete*\n\n`;
-          message += `*Repository:* ${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo}\n`;
-          message += `*Base Branch:* ${this.defaultRepoTarget.baseBranch}\n\n`;
-          message += `*Deleted Branches:* ${result.deletedBranches.length}\n`;
-          message += `*Cleaned Tasks:* ${result.cleanedTasks.length}\n`;
-
-          if (result.deletedBranches.length > 0) {
-            message += `\n*Branches Deleted:*\n${result.deletedBranches.map((b) => `• \`${b}\``).join('\n')}\n`;
-          }
-
-          if (result.errors.length > 0) {
-            message += `\n⚠️ *Errors:*\n${result.errors.map((e) => `• ${e}`).join('\n')}`;
-          }
+          const message = this.formatCleanupResult(this.defaultRepoTarget, result);
 
           await client.chat.postMessage({
             channel: channelId,
@@ -587,20 +595,7 @@ export class SlackBot {
         if (this.cleanupHandler) {
           const repoTarget: RepositoryTarget = { owner, repo, baseBranch };
           const result = await this.cleanupHandler(repoTarget);
-
-          let message = `✅ *Cleanup Complete*\n\n`;
-          message += `*Repository:* ${owner}/${repo}\n`;
-          message += `*Base Branch:* ${baseBranch}\n\n`;
-          message += `*Deleted Branches:* ${result.deletedBranches.length}\n`;
-          message += `*Cleaned Tasks:* ${result.cleanedTasks.length}\n`;
-
-          if (result.deletedBranches.length > 0) {
-            message += `\n*Branches Deleted:*\n${result.deletedBranches.map((b) => `• \`${b}\``).join('\n')}\n`;
-          }
-
-          if (result.errors.length > 0) {
-            message += `\n⚠️ *Errors:*\n${result.errors.map((e) => `• ${e}`).join('\n')}`;
-          }
+          const message = this.formatCleanupResult(repoTarget, result);
 
           await client.chat.postMessage({
             channel: channelId,
