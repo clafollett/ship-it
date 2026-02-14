@@ -15,9 +15,10 @@ export class TaskOrchestrator {
     githubOwner: string,
     githubRepo: string,
     workingDir: string,
-    baseBranch: string
+    baseBranch: string,
+    anthropicModel?: string
   ) {
-    this.aiGenerator = new AICodeGenerator(anthropicApiKey);
+    this.aiGenerator = new AICodeGenerator(anthropicApiKey, anthropicModel);
     this.github = new GitHubIntegration(githubToken, githubOwner, githubRepo, workingDir);
     this.baseBranch = baseBranch;
     this.tasks = new Map();

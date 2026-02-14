@@ -1,6 +1,6 @@
 # ShipIt - AI-Powered Development System
 
-![ShipIt Banner](https://img.shields.io/badge/AI-Powered-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue) ![Claude](https://img.shields.io/badge/Claude-3.5%20Sonnet-orange)
+![ShipIt Banner](https://img.shields.io/badge/AI-Powered-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue) ![Claude](https://img.shields.io/badge/Claude-4.5%20Sonnet-orange)
 
 An AI-powered development system inspired by Spotify's "Honk" - allowing developers to instruct AI to write, test, and deploy code through natural language interactions.
 
@@ -8,7 +8,7 @@ An AI-powered development system inspired by Spotify's "Honk" - allowing develop
 
 ShipIt enables developers to:
 - **Instruct AI via Slack** to fix bugs, add features, or refactor code
-- **Automatically generate code** using Claude 3.5 Sonnet
+- **Automatically generate code** using Claude 4.5 Sonnet (or Opus 4.6)
 - **Create pull requests** with AI-generated code changes
 - **Review and merge** AI-generated code like any other PR
 
@@ -160,7 +160,17 @@ ShipIt automatically detects task types based on keywords:
 
 ### AI Model
 
-The system uses Claude 3.5 Sonnet by default. You can modify the model in `src/core/ai-code-generator.ts`.
+The system uses Claude Sonnet 4.5 by default, with optional support for Claude Opus 4.6. You can configure the model in your `.env` file:
+
+```env
+# Use Sonnet 4.5 (faster, more cost-effective - recommended)
+ANTHROPIC_MODEL=claude-sonnet-4.5-20250514
+
+# Or use Opus 4.6 (more capable for complex tasks)
+ANTHROPIC_MODEL=claude-opus-4.6-20250514
+```
+
+You can also modify the default model in `src/core/ai-code-generator.ts`.
 
 ## 🛠️ Development
 
@@ -235,4 +245,4 @@ Inspired by Spotify's "Honk" system as described in the TechCrunch article about
 
 ---
 
-Built with ❤️ using TypeScript and Claude 3.5 Sonnet
+Built with ❤️ using TypeScript and Claude 4.5 Sonnet

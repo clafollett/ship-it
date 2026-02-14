@@ -46,6 +46,7 @@ export interface SlackMessage {
 
 export interface Config {
   anthropicApiKey: string;
+  anthropicModel?: string;
   slackBotToken: string;
   slackAppToken: string;
   slackSigningSecret: string;

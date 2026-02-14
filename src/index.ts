@@ -17,7 +17,8 @@ class ShipItApp {
       this.config.githubOwner,
       this.config.githubRepo,
       this.config.workingDirectory,
-      this.config.defaultBranch
+      this.config.defaultBranch,
+      this.config.anthropicModel
     );
 
     this.slackBot = new SlackBot(

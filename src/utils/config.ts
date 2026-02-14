@@ -22,6 +22,7 @@ export function loadConfig(): Config {
 
   return {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY!,
+    anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4.5-20250514',
     slackBotToken: process.env.SLACK_BOT_TOKEN!,
     slackAppToken: process.env.SLACK_APP_TOKEN!,
     slackSigningSecret: process.env.SLACK_SIGNING_SECRET!,
@@ -34,7 +35,7 @@ export function loadConfig(): Config {
 }
 
 export function generateTaskId(): string {
-  return `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 export function generateBranchName(taskDescription: string): string {

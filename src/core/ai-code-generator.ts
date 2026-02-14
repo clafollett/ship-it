@@ -3,11 +3,13 @@ import { CodeGenerationRequest, CodeGenerationResult } from '../types';
 
 export class AICodeGenerator {
   private client: Anthropic;
+  private model: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, model: string = 'claude-sonnet-4.5-20250514') {
     this.client = new Anthropic({
       apiKey,
     });
+    this.model = model;
   }
 
   async generateCode(request: CodeGenerationRequest): Promise<CodeGenerationResult> {
@@ -16,7 +18,7 @@ export class AICodeGenerator {
       const userPrompt = this.buildUserPrompt(request);
 
       const message = await this.client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: this.model,
         max_tokens: 8192,
         system: systemPrompt,
         messages: [
