@@ -93,7 +93,9 @@ DEFAULT_BRANCH=main
    - `commands`
 4. Subscribe to bot events:
    - `app_mention`
-5. Create a slash command: `/shipit`
+5. Create slash commands:
+   - `/shipit` - Create new tasks
+   - `/shipit-cleanup` - Clean up merged branches
 6. Install the app to your workspace
 7. Copy the tokens to your `.env` file
 
@@ -138,6 +140,25 @@ The bot will prompt you to select which repository and branch to target:
 ```
 
 Similar to mentions, the bot will prompt for repository and branch selection.
+
+### Cleanup Merged Branches
+
+After PRs are merged, you can clean up the merged branches and their associated task sessions:
+
+```
+/shipit-cleanup
+```
+
+The bot will prompt you to select which repository to clean up:
+- **Clean Default Repo**: Cleans up the default repository configured in `.env`
+- **Clean Different Repo**: Opens a modal to specify a custom repository and base branch
+
+This will:
+- Delete all branches that have been merged into the base branch
+- Remove associated completed tasks from memory
+- Clean up any lingering session data
+
+**Note**: Only merged branches are deleted. Active branches and branches ahead of the base branch are preserved.
 
 ### Example Workflow
 

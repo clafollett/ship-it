@@ -10,6 +10,11 @@ export class SlackBot {
     channel: string,
     repoTarget: RepositoryTarget
   ) => Promise<void>;
+  private cleanupHandler?: (repoTarget: RepositoryTarget) => Promise<{
+    deletedBranches: string[];
+    cleanedTasks: string[];
+    errors: string[];
+  }>;
   private defaultRepoTarget: RepositoryTarget;
   private pendingTasks: Map<
     string,
@@ -54,6 +59,27 @@ export class SlackBot {
       },
       5 * 60 * 1000
     );
+  }
+
+  private formatCleanupResult(
+    repoTarget: RepositoryTarget,
+    result: { deletedBranches: string[]; cleanedTasks: string[]; errors: string[] }
+  ): string {
+    let message = `✅ *Cleanup Complete*\n\n`;
+    message += `*Repository:* ${repoTarget.owner}/${repoTarget.repo}\n`;
+    message += `*Base Branch:* ${repoTarget.baseBranch}\n\n`;
+    message += `*Deleted Branches:* ${result.deletedBranches.length}\n`;
+    message += `*Cleaned Tasks:* ${result.cleanedTasks.length}\n`;
+
+    if (result.deletedBranches.length > 0) {
+      message += `\n*Branches Deleted:*\n${result.deletedBranches.map((b) => `• \`${b}\``).join('\n')}\n`;
+    }
+
+    if (result.errors.length > 0) {
+      message += `\n⚠️ *Errors:*\n${result.errors.map((e) => `• ${e}`).join('\n')}`;
+    }
+
+    return message;
   }
 
   private setupEventHandlers(): void {
@@ -377,6 +403,218 @@ export class SlackBot {
         console.error('Error handling slash command:', error);
       }
     });
+
+    // Listen for cleanup command
+    this.app.command('/shipit-cleanup', async ({ command, ack, client }) => {
+      await ack();
+
+      try {
+        await client.chat.postMessage({
+          channel: command.channel_id,
+          text: `Starting cleanup of merged branches...`,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*Cleanup Merged Branches*\n\nChoose which repository to clean up:`,
+              },
+            },
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*Default:* \`${this.defaultRepoTarget.owner}/${this.defaultRepoTarget.repo}\` (base: \`${this.defaultRepoTarget.baseBranch}\`)`,
+              },
+            },
+            {
+              type: 'actions',
+              block_id: `cleanup_actions`,
+              elements: [
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: '🧹 Clean Default Repo',
+                  },
+                  style: 'primary',
+                  action_id: 'cleanup_default',
+                  value: command.channel_id,
+                },
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: '⚙️ Clean Different Repo',
+                  },
+                  action_id: 'cleanup_specify',
+                  value: command.channel_id,
+                },
+              ],
+            },
+          ],
+        });
+      } catch (error) {
+        console.error('Error handling cleanup command:', error);
+      }
+    });
+
+    // Handle cleanup default button
+    this.app.action('cleanup_default', async ({ ack, body, client }) => {
+      await ack();
+      const action = body as any;
+      const channelId = action.actions[0].value;
+
+      try {
+        await client.chat.postMessage({
+          channel: channelId,
+          text: '🧹 Starting cleanup of merged branches...',
+        });
+
+        if (this.cleanupHandler) {
+          const result = await this.cleanupHandler(this.defaultRepoTarget);
+          const message = this.formatCleanupResult(this.defaultRepoTarget, result);
+
+          await client.chat.postMessage({
+            channel: channelId,
+            text: message,
+          });
+        } else {
+          await client.chat.postMessage({
+            channel: channelId,
+            text: '❌ Cleanup handler not configured',
+          });
+        }
+      } catch (error) {
+        console.error('Error handling cleanup:', error);
+        await client.chat.postMessage({
+          channel: channelId,
+          text: `❌ Error during cleanup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+      }
+    });
+
+    // Handle cleanup specify button
+    this.app.action('cleanup_specify', async ({ ack, body, client }) => {
+      await ack();
+      const action = body as any;
+      const channelId = action.actions[0].value;
+
+      try {
+        await client.views.open({
+          trigger_id: action.trigger_id,
+          view: {
+            type: 'modal',
+            callback_id: 'cleanup_repo_modal',
+            private_metadata: channelId,
+            title: {
+              type: 'plain_text',
+              text: 'Cleanup Repository',
+            },
+            submit: {
+              type: 'plain_text',
+              text: 'Clean Up',
+            },
+            blocks: [
+              {
+                type: 'input',
+                block_id: 'repository_block',
+                element: {
+                  type: 'plain_text_input',
+                  action_id: 'repository_input',
+                  initial_value: this.defaultRepoTarget.owner,
+                  placeholder: {
+                    type: 'plain_text',
+                    text: 'e.g., myorg or myusername',
+                  },
+                },
+                label: {
+                  type: 'plain_text',
+                  text: 'Repository Owner',
+                },
+              },
+              {
+                type: 'input',
+                block_id: 'repo_name_block',
+                element: {
+                  type: 'plain_text_input',
+                  action_id: 'repo_name_input',
+                  initial_value: this.defaultRepoTarget.repo,
+                  placeholder: {
+                    type: 'plain_text',
+                    text: 'e.g., my-repo',
+                  },
+                },
+                label: {
+                  type: 'plain_text',
+                  text: 'Repository Name',
+                },
+              },
+              {
+                type: 'input',
+                block_id: 'branch_block',
+                element: {
+                  type: 'plain_text_input',
+                  action_id: 'branch_input',
+                  initial_value: this.defaultRepoTarget.baseBranch,
+                  placeholder: {
+                    type: 'plain_text',
+                    text: 'e.g., main or develop',
+                  },
+                },
+                label: {
+                  type: 'plain_text',
+                  text: 'Base Branch',
+                },
+              },
+            ],
+          },
+        });
+      } catch (error) {
+        console.error('Error opening cleanup modal:', error);
+      }
+    });
+
+    // Handle cleanup modal submission
+    this.app.view('cleanup_repo_modal', async ({ ack, view, client }) => {
+      await ack();
+
+      const channelId = view.private_metadata;
+      const values = view.state.values;
+
+      const owner = values.repository_block.repository_input.value!;
+      const repo = values.repo_name_block.repo_name_input.value!;
+      const baseBranch = values.branch_block.branch_input.value!;
+
+      try {
+        await client.chat.postMessage({
+          channel: channelId,
+          text: `🧹 Starting cleanup of merged branches for ${owner}/${repo}...`,
+        });
+
+        if (this.cleanupHandler) {
+          const repoTarget: RepositoryTarget = { owner, repo, baseBranch };
+          const result = await this.cleanupHandler(repoTarget);
+          const message = this.formatCleanupResult(repoTarget, result);
+
+          await client.chat.postMessage({
+            channel: channelId,
+            text: message,
+          });
+        } else {
+          await client.chat.postMessage({
+            channel: channelId,
+            text: '❌ Cleanup handler not configured',
+          });
+        }
+      } catch (error) {
+        console.error('Error handling cleanup:', error);
+        await client.chat.postMessage({
+          channel: channelId,
+          text: `❌ Error during cleanup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+      }
+    });
   }
 
   onTask(
@@ -388,6 +626,16 @@ export class SlackBot {
     ) => Promise<void>
   ): void {
     this.taskHandler = handler;
+  }
+
+  onCleanup(
+    handler: (repoTarget: RepositoryTarget) => Promise<{
+      deletedBranches: string[];
+      cleanedTasks: string[];
+      errors: string[];
+    }>
+  ): void {
+    this.cleanupHandler = handler;
   }
 
   async sendMessage(channel: string, text: string, threadTs?: string): Promise<void> {

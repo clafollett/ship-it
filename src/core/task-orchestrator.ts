@@ -1,7 +1,7 @@
 import { AICodeGenerator } from './ai-code-generator';
 import { GitHubIntegration } from '../integrations/github';
 import { Task, CodeGenerationRequest, RepositoryTarget } from '../types';
-import { generateTaskId, generateBranchName } from '../utils/config';
+import { generateTaskId, generateBranchName, formatRepositoryString } from '../utils/config';
 
 export class TaskOrchestrator {
   private aiGenerator: AICodeGenerator;
@@ -69,7 +69,7 @@ export class TaskOrchestrator {
       createdAt: new Date(),
       branch: branchName,
       baseBranch: repoTarget.baseBranch,
-      repository: `${repoTarget.owner}/${repoTarget.repo}`,
+      repository: formatRepositoryString(repoTarget.owner, repoTarget.repo),
     };
 
     this.tasks.set(taskId, task);
@@ -201,6 +201,63 @@ ${result.explanation || result.generatedCode || 'No code changes required'}
 
   getAllTasks(): Task[] {
     return Array.from(this.tasks.values());
+  }
+
+  async cleanupMergedBranches(repoTarget: RepositoryTarget): Promise<{
+    deletedBranches: string[];
+    cleanedTasks: string[];
+    errors: string[];
+  }> {
+    const result = {
+      deletedBranches: [] as string[],
+      cleanedTasks: [] as string[],
+      errors: [] as string[],
+    };
+
+    try {
+      const github = await this.getGitHubIntegration(repoTarget);
+
+      // Get list of merged branches
+      console.log(`Checking for merged branches in ${repoTarget.owner}/${repoTarget.repo}...`);
+      const mergedBranches = await github.listMergedBranches(repoTarget.baseBranch);
+      console.log(`Found ${mergedBranches.length} merged branches`);
+
+      // Delete each merged branch
+      for (const branchName of mergedBranches) {
+        try {
+          await github.deleteBranch(branchName);
+          result.deletedBranches.push(branchName);
+
+          // Clean up associated tasks
+          const repoString = formatRepositoryString(repoTarget.owner, repoTarget.repo);
+          for (const [taskId, task] of this.tasks.entries()) {
+            if (
+              task.branch === branchName &&
+              task.repository === repoString &&
+              task.status === 'completed'
+            ) {
+              this.tasks.delete(taskId);
+              result.cleanedTasks.push(taskId);
+              console.log(`Cleaned up task ${taskId} for branch ${branchName}`);
+            }
+          }
+        } catch (error) {
+          const errorMsg = `Failed to delete branch ${branchName}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          console.error(errorMsg);
+          result.errors.push(errorMsg);
+        }
+      }
+
+      console.log(
+        `Cleanup complete: ${result.deletedBranches.length} branches deleted, ${result.cleanedTasks.length} tasks cleaned`
+      );
+    } catch (error) {
+      const errorMsg = `Failed to cleanup merged branches: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error(errorMsg);
+      result.errors.push(errorMsg);
+    }
+
+    return result;
   }
 
   async cleanup(): Promise<void> {

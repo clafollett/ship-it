@@ -73,6 +73,11 @@ class ShipItApp {
         }
       );
 
+      // Set up cleanup handler for Slack
+      this.slackBot.onCleanup(async (repoTarget: RepositoryTarget) => {
+        return await this.orchestrator.cleanupMergedBranches(repoTarget);
+      });
+
       // Start the Slack bot
       await this.slackBot.start();
 
