@@ -4,6 +4,8 @@
 
 ShipIt is an AI-powered development system that enables developers to instruct AI to write code through natural language. It's inspired by Spotify's "Honk" system and built with TypeScript and Claude 4.5 Sonnet (with support for Opus 4.6).
 
+**New Feature**: ShipIt now supports dynamic repository and branch selection, allowing a single instance to manage multiple repositories!
+
 ## Core Concepts
 
 ### Developer-AI Workflow Shift
@@ -49,19 +51,42 @@ The developer's role shifts from:
 **Responsibilities:**
 - Listen for mentions (`@ShipIt`) in Slack channels
 - Handle slash commands (`/shipit`)
+- Present interactive repository/branch selection UI
 - Send task updates and notifications
 - Maintain conversation context
 
 **Key Features:**
 - Socket Mode for real-time communication
+- Interactive buttons for "Use Default" vs "Specify Different"
+- Modal forms for custom repository/branch input
 - Thread-based responses for organized conversations
 - Status updates with emoji indicators
 - Error handling and user feedback
 
+**Repository Selection Flow:**
+```
+User: @ShipIt Add feature X
+
+ShipIt: [Shows buttons]
+  ✓ Use Default (owner/repo → branch)
+  ⚙️ Specify Different
+
+If "Use Default":
+  → Immediately starts task with configured repo/branch
+
+If "Specify Different":
+  → Opens modal with fields:
+     - Repository Owner
+     - Repository Name  
+     - Base Branch
+  → User submits → Task starts with custom repo/branch
+```
+
 **Event Flow:**
 ```
-Slack Message → Event Handler → Parse Instruction → 
-Trigger Task Handler → Send Acknowledgment
+Slack Message → Event Handler → Show Buttons → 
+User Click → Task Handler (with RepositoryTarget) → 
+Trigger Task Execution
 ```
 
 #### 2. AI Code Generator (`src/core/ai-code-generator.ts`)
@@ -115,6 +140,21 @@ User Prompt = Task Description + Context + Relevant Files
 - Manage task lifecycle
 - Handle errors and rollbacks
 - Track task status
+- **Manage multiple repository instances**
+
+**Multi-Repository Support:**
+```typescript
+// Maintains a map of GitHub integrations, one per repository
+githubInstances: Map<string, GitHubIntegration>
+
+// Key format: "owner/repo"
+// Example: "myorg/frontend", "myorg/backend", "otherorg/api"
+
+// Each repository gets:
+// - Separate working directory
+// - Isolated git operations
+// - Independent PR creation
+```
 
 **Task Lifecycle:**
 ```
@@ -125,30 +165,78 @@ User Prompt = Task Description + Context + Relevant Files
                      └───────────────────────────────┘
 ```
 
+**Enhanced Task Properties:**
+```typescript
+interface Task {
+  // ... existing fields
+  repository?: string;    // "owner/repo"
+  baseBranch?: string;    // "main", "develop", etc.
+}
+```
+
 ## Data Flow
 
-### Complete Request Flow
+### Complete Request Flow (with Repository Selection)
 
 ```
 1. Developer Instruction
    ↓
-2. Slack Bot (receives & parses)
+2. Slack Bot (receives & shows repo selection buttons)
    ↓
-3. Task Orchestrator (creates task)
+3. User selects repository/branch
+   ↓ 
+4. Task Orchestrator (creates task with RepositoryTarget)
    ↓
-4. AI Code Generator (generates code)
+5. Get/Create GitHub Integration for target repository
    ↓
-5. GitHub Integration (creates branch)
+6. AI Code Generator (generates code)
    ↓
-6. GitHub Integration (applies changes)
+7. GitHub Integration (creates branch in target repo)
    ↓
-7. GitHub Integration (commits & pushes)
+8. GitHub Integration (applies changes)
    ↓
-8. GitHub Integration (creates PR)
+9. GitHub Integration (commits & pushes)
    ↓
-9. Slack Bot (notifies completion)
+10. GitHub Integration (creates PR in target repo → base branch)
    ↓
-10. Developer (reviews PR)
+11. Slack Bot (notifies completion with repo/branch info)
+   ↓
+12. Developer (reviews PR)
+```
+
+### Repository Target Flow
+
+```
+┌─────────────────────────────────────────┐
+│  User Input: "Add feature X"            │
+└──────────────────┬──────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────┐
+│  Slack Prompt: Select Repository        │
+│  [ Use Default ] [ Specify Different ]  │
+└──────────────────┬──────────────────────┘
+                   │
+         ┌─────────┴─────────┐
+         │                   │
+         ▼                   ▼
+    Use Default       Open Modal
+    owner/repo        ┌──────────────┐
+    → branch          │ Owner: ___   │
+                      │ Repo: ___    │
+                      │ Branch: ___  │
+                      └──────┬───────┘
+                             │
+                   ┌─────────┴─────────┐
+                   │                   │
+                   ▼                   ▼
+           RepositoryTarget    RepositoryTarget
+           (from config)       (from user input)
+                   │                   │
+                   └─────────┬─────────┘
+                             ▼
+                    Execute Task with
+                    specified repo/branch
 ```
 
 ### Task State Management
