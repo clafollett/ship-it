@@ -1,0 +1,16 @@
+# Copy this file to terraform.tfvars and fill in your values.
+#   cp terraform.tfvars.example terraform.tfvars
+
+aws_region   = "us-east-1"
+project_name = "ship-it"
+
+# Your GitHub repository
+github_owner = "your-org"
+github_repo  = "your-repo"
+
+# Optional overrides
+# default_branch  = "main"
+# anthropic_model = "claude-sonnet-4-5-20250514"
+# task_cpu        = 256   # 0.25 vCPU
+# task_memory     = 512   # 512 MiB
+# log_retention_days = 14
