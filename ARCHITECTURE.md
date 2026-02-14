@@ -2,7 +2,7 @@
 
 ## Overview
 
-ShipIt is an AI-powered development system that enables developers to instruct AI to write code through natural language. It's inspired by Spotify's "Honk" system and built with TypeScript and Claude 3.5 Sonnet.
+ShipIt is an AI-powered development system that enables developers to instruct AI to write code through natural language. It's inspired by Spotify's "Honk" system and built with TypeScript and Claude 4.5 Sonnet (with support for Opus 4.6).
 
 ## Core Concepts
 

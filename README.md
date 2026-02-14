@@ -38,7 +38,7 @@ Just like Spotify's internal system, ShipIt shifts the developer's role from wri
 ### Components
 
 - **SlackBot**: Receives developer instructions via Slack mentions or slash commands
-- **AICodeGenerator**: Uses Claude 3.5 Sonnet to generate code based on instructions
+- **AICodeGenerator**: Uses Claude 4.5 Sonnet (or Opus 4.6) to generate code based on instructions
 - **TaskOrchestrator**: Coordinates the entire workflow from instruction to PR
 - **GitHubIntegration**: Manages git operations and creates pull requests
 
