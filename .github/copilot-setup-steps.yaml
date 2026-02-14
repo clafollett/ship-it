@@ -1,0 +1,43 @@
+# GitHub Copilot Setup Steps for ship-it repository
+# AI-powered development system with Slack, Claude, and GitHub integration
+
+setup_steps:
+  # Step 1: Verify Node.js 18+ is installed
+  - description: "Verify Node.js version (requires 18+)"
+    command: "node --version"
+    
+  # Step 2: Verify npm is installed  
+  - description: "Verify npm is installed"
+    command: "npm --version"
+    
+  # Step 3: Install all project dependencies
+  - description: "Install project dependencies"
+    command: "npm install"
+    
+  # Step 4: Copy environment template
+  - description: "Create .env file from template if it doesn't exist"
+    command: "[ ! -f .env ] && cp .env.example .env && echo 'Created .env file - please configure with your API keys' || echo '.env already exists'"
+    
+  # Step 5: Validate configuration (optional - requires API keys)
+  - description: "Test configuration (skips if .env not configured)"
+    command: "npm run test:config 2>&1 || echo 'Configuration test skipped - configure .env with API keys to enable'"
+    
+  # Step 6: Run linting checks
+  - description: "Run ESLint to check code quality"
+    command: "npm run lint"
+    
+  # Step 7: Check code formatting
+  - description: "Check code formatting with Prettier"
+    command: "npx prettier --check 'src/**/*.ts'"
+    
+  # Step 8: Build TypeScript
+  - description: "Compile TypeScript to JavaScript"
+    command: "npm run build"
+
+notes:
+  - "This is an AI-powered development system using TypeScript, Claude, Slack, and GitHub"
+  - "Requires API keys for Anthropic, Slack, and GitHub to run"
+  - "See .env.example for required environment variables"
+  - "Use 'npm run dev' to run in development mode with tsx"
+  - "Use 'npm start' to run the compiled JavaScript in production"
+  - "Documentation available in: README.md, QUICKSTART.md, ARCHITECTURE.md, EXAMPLES.md"
