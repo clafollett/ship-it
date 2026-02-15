@@ -16,23 +16,13 @@ Just like Spotify's internal system, ShipIt shifts the developer's role from wri
 
 ## 🏗️ Architecture
 
-```
-┌─────────────┐         ┌──────────────┐
-│   Slack     │────────▶│   ShipIt     │
-│   (Input)   │         │     Bot      │
-└─────────────┘         └──────┬───────┘
-                               │
-                               ▼
-                    ┌──────────────────┐
-                    │ Task Orchestrator │
-                    └────────┬──────────┘
-                             │
-                ┌────────────┼────────────┐
-                ▼            ▼            ▼
-         ┌──────────┐  ┌─────────┐  ┌────────┐
-         │  Claude  │  │  GitHub │  │  Git   │
-         │   API    │  │   API   │  │  Repo  │
-         └──────────┘  └─────────┘  └────────┘
+```mermaid
+flowchart TD
+    Slack["Slack (Input)"] -->|mention / slash cmd| Bot["ShipIt Bot"]
+    Bot --> Orchestrator["Task Orchestrator"]
+    Orchestrator --> Claude["Claude API"]
+    Orchestrator --> GitHub["GitHub API"]
+    Orchestrator --> Git["Git Repo"]
 ```
 
 ### Components
@@ -209,10 +199,10 @@ The system uses Claude Sonnet 4.5 by default, with optional support for Claude O
 
 ```env
 # Use Sonnet 4.5 (faster, more cost-effective - recommended)
-ANTHROPIC_MODEL=claude-sonnet-4.5-20250514
+ANTHROPIC_MODEL=claude-sonnet-4-5-20250514
 
 # Or use Opus 4.6 (more capable for complex tasks)
-ANTHROPIC_MODEL=claude-opus-4.6-20250514
+ANTHROPIC_MODEL=claude-opus-4-6-20250514
 ```
 
 You can also modify the default model in `src/core/ai-code-generator.ts`.
@@ -225,17 +215,13 @@ You can also modify the default model in `src/core/ai-code-generator.ts`.
 npm run build
 ```
 
-### Lint
+### Lint & Format
 
 ```bash
-npm run lint
-npm run lint:fix
-```
-
-### Format
-
-```bash
-npm run format
+npm run check        # lint + format check
+npm run check:fix    # auto-fix both
+npm run lint         # lint only
+npm run format       # format only
 ```
 
 ## 📂 Project Structure
@@ -244,8 +230,8 @@ npm run format
 ship-it/
 ├── src/
 │   ├── core/
-│   │   ├── ai-code-generator.ts    # Claude AI integration
-│   │   └── task-orchestrator.ts    # Main task coordination
+│   │   ├── ai-code-generator.ts     # Claude AI integration
+│   │   └── task-orchestrator.ts     # Main task coordination
 │   ├── integrations/
 │   │   ├── github.ts                # GitHub API & Git operations
 │   │   └── slack.ts                 # Slack bot
@@ -254,9 +240,11 @@ ship-it/
 │   ├── utils/
 │   │   └── config.ts                # Configuration utilities
 │   └── index.ts                     # Application entry point
+├── infra/                            # Terraform IaC (AWS ECS Fargate)
+├── .github/workflows/ci.yml         # CI pipeline
+├── Dockerfile                        # Multi-stage Docker build
 ├── .env.example                      # Environment variables template
-├── .eslintrc.json                    # ESLint configuration
-├── .prettierrc                       # Prettier configuration
+├── biome.json                        # Biome linter & formatter config
 ├── tsconfig.json                     # TypeScript configuration
 └── package.json                      # Project dependencies
 ```
