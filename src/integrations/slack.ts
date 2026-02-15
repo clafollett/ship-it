@@ -472,6 +472,7 @@ export class SlackBot {
     // Listen for status command
     this.app.command('/shipit-status', async ({ command, ack, client }) => {
       await ack();
+      console.log(`Status command invoked in channel ${command.channel_id}`);
 
       try {
         if (!this.statusHandler) {
@@ -711,6 +712,37 @@ export class SlackBot {
     return `${days}d ago`;
   }
 
+  private static readonly MAX_SECTION_TEXT_LENGTH = 2800;
+
+  private addTaskSectionBlocks(
+    blocks: Array<Record<string, unknown>>,
+    heading: string,
+    tasks: Task[]
+  ): void {
+    if (tasks.length === 0) return;
+
+    const lines = tasks.map((t) => this.formatTaskLine(t));
+    let currentText = `*${heading}*`;
+
+    for (const line of lines) {
+      const candidate = `${currentText}\n${line}`;
+      if (candidate.length > SlackBot.MAX_SECTION_TEXT_LENGTH) {
+        blocks.push({
+          type: 'section',
+          text: { type: 'mrkdwn', text: currentText },
+        });
+        currentText = `*${heading} (cont.)*\n${line}`;
+      } else {
+        currentText = candidate;
+      }
+    }
+
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: currentText },
+    });
+  }
+
   private formatStatusBlocks(summary: {
     inProgress: Task[];
     completed: Task[];
@@ -752,49 +784,10 @@ export class SlackBot {
 
     blocks.push({ type: 'divider' });
 
-    // In-progress tasks
-    if (summary.inProgress.length > 0) {
-      blocks.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*In Progress*\n${summary.inProgress.map((t) => this.formatTaskLine(t)).join('\n')}`,
-        },
-      });
-    }
-
-    // Pending tasks
-    if (summary.pending.length > 0) {
-      blocks.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Pending*\n${summary.pending.map((t) => this.formatTaskLine(t)).join('\n')}`,
-        },
-      });
-    }
-
-    // Failed tasks
-    if (summary.failed.length > 0) {
-      blocks.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Failed*\n${summary.failed.map((t) => this.formatTaskLine(t)).join('\n')}`,
-        },
-      });
-    }
-
-    // Completed tasks (most recent)
-    if (summary.completed.length > 0) {
-      blocks.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Recently Completed*\n${summary.completed.map((t) => this.formatTaskLine(t)).join('\n')}`,
-        },
-      });
-    }
+    this.addTaskSectionBlocks(blocks, 'In Progress', summary.inProgress);
+    this.addTaskSectionBlocks(blocks, 'Pending', summary.pending);
+    this.addTaskSectionBlocks(blocks, 'Failed', summary.failed);
+    this.addTaskSectionBlocks(blocks, 'Recently Completed', summary.completed);
 
     return blocks;
   }
