@@ -204,6 +204,27 @@ ${result.explanation || result.generatedCode || 'No code changes required'}
     return Array.from(this.tasks.values());
   }
 
+  getTaskSummary(): {
+    inProgress: Task[];
+    completed: Task[];
+    failed: Task[];
+    pending: Task[];
+  } {
+    const tasks = this.getAllTasks();
+    return {
+      inProgress: tasks.filter((t) => t.status === 'in_progress'),
+      completed: tasks
+        .filter((t) => t.status === 'completed')
+        .sort((a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0))
+        .slice(0, 10),
+      failed: tasks
+        .filter((t) => t.status === 'failed')
+        .sort((a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0))
+        .slice(0, 10),
+      pending: tasks.filter((t) => t.status === 'pending'),
+    };
+  }
+
   async cleanupMergedBranches(repoTarget: RepositoryTarget): Promise<{
     deletedBranches: string[];
     cleanedTasks: string[];

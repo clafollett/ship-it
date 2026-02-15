@@ -15,6 +15,12 @@ export class SlackBot {
     cleanedTasks: string[];
     errors: string[];
   }>;
+  private statusHandler?: () => {
+    inProgress: Task[];
+    completed: Task[];
+    failed: Task[];
+    pending: Task[];
+  };
   private defaultRepoTarget: RepositoryTarget;
   private pendingTasks: Map<
     string,
@@ -463,6 +469,38 @@ export class SlackBot {
       }
     });
 
+    // Listen for status command
+    this.app.command('/shipit-status', async ({ command, ack, client }) => {
+      await ack();
+      console.log(`Status command invoked in channel ${command.channel_id}`);
+
+      try {
+        if (!this.statusHandler) {
+          await client.chat.postMessage({
+            channel: command.channel_id,
+            text: '❌ Status handler not configured',
+          });
+          return;
+        }
+
+        const summary = this.statusHandler();
+        const blocks = this.formatStatusBlocks(summary);
+
+        await client.chat.postMessage({
+          channel: command.channel_id,
+          text: 'ShipIt Task Status',
+          // biome-ignore lint/suspicious/noExplicitAny: Slack block types are complex unions
+          blocks: blocks as any,
+        });
+      } catch (error) {
+        console.error('Error handling status command:', error);
+        await client.chat.postMessage({
+          channel: command.channel_id,
+          text: `❌ Error retrieving status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+      }
+    });
+
     // Handle cleanup default button
     this.app.action('cleanup_default', async ({ ack, body, client }) => {
       await ack();
@@ -642,6 +680,117 @@ export class SlackBot {
     }>
   ): void {
     this.cleanupHandler = handler;
+  }
+
+  onStatus(
+    handler: () => {
+      inProgress: Task[];
+      completed: Task[];
+      failed: Task[];
+      pending: Task[];
+    }
+  ): void {
+    this.statusHandler = handler;
+  }
+
+  private formatTaskLine(task: Task): string {
+    const repo = task.repository ? ` (\`${task.repository}\`)` : '';
+    const pr = task.pullRequestUrl ? ` - <${task.pullRequestUrl}|View PR>` : '';
+    const error = task.error ? ` - _${task.error}_` : '';
+    const age = this.formatAge(task.createdAt);
+    return `• ${task.description}${repo} [${task.type}] ${age}${pr}${error}`;
+  }
+
+  private formatAge(date: Date): string {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 0) return 'just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
+  private static readonly MAX_SECTION_TEXT_LENGTH = 2800;
+
+  private addTaskSectionBlocks(
+    blocks: Array<Record<string, unknown>>,
+    heading: string,
+    tasks: Task[]
+  ): void {
+    if (tasks.length === 0) return;
+
+    const lines = tasks.map((t) => this.formatTaskLine(t));
+    let currentText = `*${heading}*`;
+
+    for (const line of lines) {
+      const candidate = `${currentText}\n${line}`;
+      if (candidate.length > SlackBot.MAX_SECTION_TEXT_LENGTH) {
+        blocks.push({
+          type: 'section',
+          text: { type: 'mrkdwn', text: currentText },
+        });
+        currentText = `*${heading} (cont.)*\n${line}`;
+      } else {
+        currentText = candidate;
+      }
+    }
+
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: currentText },
+    });
+  }
+
+  private formatStatusBlocks(summary: {
+    inProgress: Task[];
+    completed: Task[];
+    failed: Task[];
+    pending: Task[];
+  }): Array<Record<string, unknown>> {
+    const totalTasks =
+      summary.inProgress.length +
+      summary.completed.length +
+      summary.failed.length +
+      summary.pending.length;
+
+    const blocks: Array<Record<string, unknown>> = [
+      {
+        type: 'header',
+        text: { type: 'plain_text', text: 'ShipIt Task Status' },
+      },
+    ];
+
+    if (totalTasks === 0) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: 'No tasks found. Use `/shipit` or mention `@ShipIt` to create one.',
+        },
+      });
+      return blocks;
+    }
+
+    // Summary counts
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Total:* ${totalTasks} | *In Progress:* ${summary.inProgress.length} | *Pending:* ${summary.pending.length} | *Completed:* ${summary.completed.length} | *Failed:* ${summary.failed.length}`,
+      },
+    });
+
+    blocks.push({ type: 'divider' });
+
+    this.addTaskSectionBlocks(blocks, 'In Progress', summary.inProgress);
+    this.addTaskSectionBlocks(blocks, 'Pending', summary.pending);
+    this.addTaskSectionBlocks(blocks, 'Failed', summary.failed);
+    this.addTaskSectionBlocks(blocks, 'Recently Completed', summary.completed);
+
+    return blocks;
   }
 
   async sendMessage(channel: string, text: string, threadTs?: string): Promise<void> {
