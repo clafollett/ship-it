@@ -134,8 +134,13 @@ resource "aws_ecs_service" "app" {
 
   capacity_provider_strategy {
     capacity_provider = "FARGATE_SPOT"
-    weight            = 1
+    weight            = 2
     base              = 1
+  }
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    weight            = 1
   }
 
   network_configuration {
