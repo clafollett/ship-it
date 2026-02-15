@@ -78,6 +78,11 @@ class ShipItApp {
         return await this.orchestrator.cleanupMergedBranches(repoTarget);
       });
 
+      // Set up status handler for Slack
+      this.slackBot.onStatus(() => {
+        return this.orchestrator.getTaskSummary();
+      });
+
       // Start the Slack bot
       await this.slackBot.start();
 
